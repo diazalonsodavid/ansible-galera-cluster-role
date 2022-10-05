@@ -1,0 +1,83 @@
+---
+## PRECONFIG VARIABLES
+##
+# Do not change this unless you know what you're doing
+chains: [ 'INPUT', 'OUTPUT', 'FORWARD' ]
+
+# Ports that are allowed to send/receive traffic from the world.
+# Edit this list to add X protocol or ports used by MySQL EE.
+world_allowed_ports:
+  - { port: '3306', protocol: 'tcp' }  # MariaDB native protocol
+  - { port: '4567', protocol: 'tcp' }  # Galera replication
+  - { port: '4567', protocol: 'udp' }  # Galera replication
+  - { port: '4444', protocol: 'tcp' }  # Galera SST
+  - { port: '4568', protocol: 'tcp' }  # Galera IST
+
+# Kernel arguments to set at runtime and make persistent
+kernel_parameters:
+  - { key: 'vm.swappiness', value: '0' }
+
+# Additional packages to install, useful for diagnostics
+# or simplifying manual tasks
+package_list:
+    - linux-tools-common
+    - sysstat
+    - net-tools
+    - numactl
+
+
+      
+## NODES VARIABLES
+##
+# system user
+
+mysql_user: mysql
+mysql_group: mysql
+
+
+# paths
+
+script_dir: /usr/local/scripts
+mysql_conf_dir: /etc/mysql
+mysql_base_dir: /usr/local/mysql
+mysql_data_dir: /var/mysql/data
+mysql_log_dir: /var/mysql/logs
+mysql_tmp_dir: /var/mysql/tmp
+
+
+# system files
+
+# socket file and PID file will be here
+mysql_run_dir: /var/run/mysqld
+# socker file name
+mysql_socket: mysqld.sock
+# PID file name
+mysql_pid: mysqld.pid
+
+
+# logs
+
+# name of the error log, which will be in mysql_log_dir
+mysql_error_log: error.log
+
+## Passwords
+cluster_sst_user:
+cluster_sst_password:
+superuser_password:
+xtrabackup_mysql_user:
+xtrabackup_mysql_password:
+
+## Below user and password should be created after installation.
+mysql_exporter_user:
+mysql_exporter_pass:
+
+## Mysql_exporter ##
+mysqld_exporter_binary_local_dir: ""
+mysqld_exporter_version: 0.12.1
+mysqld_exporter_web_listen_address: "0.0.0.0:9104"
+
+mysqld_exporter_my_cnf: ""
+
+mysqld_exporter_collect: []
+
+mysqld_exporter_no_collect: []

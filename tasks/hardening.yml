@@ -1,0 +1,23 @@
+---
+
+- name: Disable mysql_history
+  shell: |
+    usermod -s /bin/false mysql
+    usermod -c "MySQL Server,,," mysql
+
+- name: Disable mysql_history
+  shell: ln -s /dev/null $HOME/.mysql_history ln -s /dev/null $HOME/.mysql_history
+  ignore_errors: true
+
+- name: Give permissions to data path
+  ansible.builtin.file:
+    path: "{{ mysql_data_dir }}"
+    owner: mysql
+    group: mysql
+    mode: '0700'
+
+
+- name: Copy mysql_secret
+  template:
+    src="./templates/mysql_secret.j2"
+    dest=/root/.mysql.secret

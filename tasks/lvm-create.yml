@@ -1,0 +1,57 @@
+---
+## Install lvm2 dependency
+
+- name: Install lvm2 dependency
+  ansible.builtin.apt:
+    name: lvm2
+    state: present
+
+## Creating physical volumes from a disk partition.
+- name: Create a partition
+  community.general.parted:
+    device: "{{ device }}"
+    number: "{{ partitions_numbers }}"
+    flags: [ lvm ]
+    state: present
+    part_start: 1GiB
+
+## Create VolumenGroup from a Physical Volume.
+- name: Create a volume group
+  community.general.lvg:
+    vg: "{{ vg_name }}"
+    pvs: "{{ pv_device }}"
+    pesize: "{{ vg_size }}"
+    force: true
+
+## Create Logical Volumes from Volume Group.
+- name: Create a logical volume
+  community.general.lvol:
+    vg: "{{ vg_name }}"
+    lv: "{{ item.lv_name }}"
+    size: "{{ item.lv_size }}"
+  with_items: "{{ lvm }}"
+
+##  Create Mount Point
+- name: Create Mount Point
+  ansible.builtin.file:
+    path: "{{ item.mount_points }}"
+    state: directory
+    recurse: yes
+    mode: "{{ item.chmod }}"
+    owner: "{{ item.owner }}"
+  with_items: "{{ lvm }}"
+
+- name: Create filesystem
+  community.general.filesystem:
+    fstype: "{{ item.filesys_type }}"
+    dev: /dev/{{ vg_name }}/{{ item.lv_name }}
+  with_items: "{{ lvm }}"
+
+- name: Config fstab
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    line: /dev/{{ vg_name }}/{{ item.lv_name }} {{ item.mount_points }} {{ item.filesys_type }} defaults 0 0
+  with_items: "{{ lvm }}"
+
+- name: Apply fstab file
+  ansible.builtin.shell: mount -a
