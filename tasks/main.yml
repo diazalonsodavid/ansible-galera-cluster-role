@@ -5,7 +5,22 @@
     extensions:
       - 'yml'
 
+- name: Ensure group MySQL exists
+  ansible.builtin.group:
+    name: "{{ mysql_group }}"
+    state: present
+
+- name: Add mysql user
+  user:
+    name: "{{ mysql_user }}"
+    comment: MariaDB daemon
+    group: "{{ mysql_group }}"
+    create_home: no
+    shell: /sbin/nologin
+    state: present
+
 - name: Include lvm-create.yml
+  tags: lvm
   ansible.builtin.import_tasks: lvm-create.yml
  
 - name: Include preconf.yml
@@ -14,19 +29,11 @@
 - name: Include validate.yml
   ansible.builtin.import_tasks: validate.yml
 
-- name: Include clean.yml
-  ansible.builtin.import_tasks: clean.yml
-  when: (db_stop is defined and db_stop == '1') or (db_init is defined and db_init == '1')
-
-
 ##  Percona Tools
 ##  =============
 
 - name: Adds percona key
-  apt_key:
-    keyserver: keyserver.ubuntu.com
-    id: "{{ item }}"
-    state: present
+  ansible.builtin.command: "gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys {{ item }}"
   with_items:
     - E1E2CD202D607DAF
     - 1C4CBDCDCD2EFD2A
@@ -38,17 +45,13 @@
     deb: "https://repo.percona.com/apt/percona-release_latest.{{ ansible_distribution_release | lower }}_all.deb"
     update_cache: true
     state: present
+  tags: repo
 
 
 - name: Update apt-get repo and cache
   ansible.builtin.apt:
     update_cache: true
     force_apt_get: true
-
-- name: Install mysql-client
-  ansible.builtin.apt:
-    name: mysql-client
-    state: present
 
 - name: Install Xtrabackup
   ansible.builtin.apt:
@@ -76,64 +79,58 @@
 ##  Prepare MariaDB installation
 ##  ==========================
 
-- name: Ensure group MySQL exists
-  ansible.builtin.group:
-    name: mysql
+- name: Install mariadb-server First Node
+  ansible.builtin.apt:
+    name: "{{ item }}"
     state: present
+  with_items: 
+    - mariadb-server 
+    - mariadb-client 
+    - galera-4
+    - galera-arbitrator-4
+  when: 
+    - inventory_hostname in groups["nodo1_local"]
 
-- name: Add mysql user
-  user:
-    name: "{{ mysql_user }}"
-    comment: MariaDB daemon
-    group: "{{ mysql_group }}"
-    create_home: no
-    shell: /sbin/nologin
+- name: Install mariadb-server Rest of Nodes.
+  ansible.builtin.apt:
+    name: "{{ item }}"
     state: present
+  with_items: 
+    - mariadb-server 
+    - mariadb-client 
+    - galera-4
+  when:
+    - inventory_hostname in groups["nodo_n_local"]
 
-- name: Create scripts dir
+- name: Replace init mariadb.service
+  ansible.builtin.replace:
+    path: /usr/lib/systemd/system/mariadb.service
+    regexp: 'LimitNOFILE=32768'
+    replace: 'LimitNOFILE=infinity'
+  ignore_errors: true
+
+- name: Replace init mariadb.service2
+  ansible.builtin.replace:
+    path: /usr/lib/systemd/system/mariadb.service
+    regexp: 'LimitMEMLOCK=524288'
+    replace: 'LimitMEMLOCK=16777216'
+  ignore_errors: true
+
+- name: Reload service Mariadb
+  ansible.builtin.systemd:
+    name: mariadb.service
+    state: reloaded
+
+- name: Create Paths
   file:
-    path: "{{ script_dir }}"
-    state: directory
-
-- name: Copy get-tarball.sh and config-get-tarball.sh
-  copy:
-    src: "./files/{{ item }}"
-    dest: "{{ script_dir }}"
-    owner: root
-    group: root
-    mode: 'preserve'
-  with_items:
-    - get-tarball.sh
-    - config-get-tarball.sh
-
-# Returns code 100 if the tarball was unpacked.
-# This check can be used later to check if new MariaDB was put in place:
-# get_tarball.rc == 100
-- name: Run get-tarball.sh
-  shell: >
-    "{{ script_dir }}/get-tarball.sh"
-  register: get_tarball
-  failed_when: get_tarball.rc != 0 and get_tarball.rc != 100
-
-- name: Create MariaDB basedir
-  file:
-    path: "{{ mysql_base_dir }}"
+    path: "{{ item }}"
     owner: "{{ mysql_user }}"
     group: "{{ mysql_group }}"
+    mode: '0770'
     recurse: yes
     state: directory
-  when: get_tarball.rc == 100
+  with_items: "{{ paths }}"
 
-# We separate directory creation and permissions
-# because we only want to know if datadir was created
-# to determine if mysqld --initialize should be run.
-
-- name: Create MariaDB datadir
-  file:
-    path: "{{ mysql_data_dir }}"
-    state: directory
-  register: datadir
-  when: get_tarball.rc == 100
 
 - name: Set MariaDB datadir permissions
   file:
@@ -141,57 +138,32 @@
     owner: "{{ mysql_user }}"
     group: "{{ mysql_group }}"
     mode: '777'
-  when: get_tarball.rc == 100
 
-- name: Create MariaDB log dir
+- name: Set MariaDB logs permissions
   file:
     path: "{{ mysql_log_dir }}"
     owner: "{{ mysql_user }}"
     group: "{{ mysql_group }}"
-    mode: '764'
-    recurse: yes
-    state: directory
-  when: get_tarball.rc == 100
+    mode: '777'
 
-- name: Create MariaDB temp dir
-  file:
-    path: "{{ mysql_tmp_dir }}"
-    owner: "{{ mysql_user }}"
-    group: "{{ mysql_group }}"
-    mode: '755'
-    state: directory
-  when: get_tarball.rc == 100
-
-- name: Create MariaDB run dir (socket, PID)
-  file:
-    path: "{{ mysql_run_dir }}"
-    owner: "{{ mysql_user }}"
-    group: "{{ mysql_group }}"
-    mode: '755'
-    state: directory
-  when: get_tarball.rc == 100
+- name: Copy each file over that matches the given pattern
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "/etc/ssl/certs/"
+    mode: '600'
+  with_fileglob:
+    - "./files/*"
+  
 
 - name: Add lib to ld.so.conf
   lineinfile:
     dest=/etc/ld.so.conf
     line="{{ mysql_base_dir }}/lib/"
-  when: get_tarball.rc == 100
 
 - name: ldconfig
   command: /sbin/ldconfig
-  when: get_tarball.rc == 100
+  ignore_errors: true
 
-
-# Create config dir and copy general config file and host config file
-
-- name: Create MariaDB configuration dir
-  file:
-    path: "{{ mysql_conf_dir }}"
-    owner: "{{ mysql_user }}"
-    group: "{{ mysql_group }}"
-    mode: '777'
-    state: directory
-  when: get_tarball.rc == 100
 
 - name: Delete files/dirs not created by us
   file:
@@ -220,17 +192,18 @@
   template:
     src="./templates/wsrep/first_node.cnf.j2"
     dest=/etc/mysql/include/wsrep.cnf
-  when: inventory_hostname == cluster_hosts[0].node_name
+  when: inventory_hostname in groups["nodo1_local"]
 
 - name: Copy wsrep.cnf (default)
   template:
     src="./templates/wsrep/default.cnf.j2"
     dest=/etc/mysql/include/wsrep.cnf
   when: 
-    - inventory_hostname in groups["nodo_n"]
+    - inventory_hostname in groups["nodo_n_local"]
 
+# Error with local_action try to run in localhost
 - name: Check if host config file exists
-  local_action: stat path="/etc/mysql/{{ inventory_hostname }}.cnf"
+  command: stat path="/etc/mysql/{{ inventory_hostname }}.cnf"
   register: host_config_file
 
 - name: Copy host config file if exists
@@ -252,65 +225,46 @@
 
 - name: Initialize datadir
   command: "{{ mysql_base_dir }}/bin/mysqld --initialize --user='{{ mysql_user }}'"
-  ignore_errors: yes
+  ignore_errors: true
   when: datadir_file_count.stdout == '0'
-
-- name: Fix MariaDB datadir and log dir permissions
-  file:
-    path: "{{ item }}"
-    owner: "{{ mysql_user }}"
-    group: "{{ mysql_group }}"
-    mode: '774'
-    recurse: yes
-  with_items:
-    - "{{ mysql_data_dir }}"
-    - "{{ mysql_log_dir }}"
 
 - name: Add MariaDB bin path to profile
   lineinfile: dest=/etc/profile line="export PATH=$PATH:{{ mysql_base_dir }}/bin/"
 
 - name: Add custom scripts path to profile
   lineinfile: dest=/etc/profile line="export PATH=$PATH:{{ script_dir }}"
-  when: get_tarball.rc == 100
 
 - name: Run profile
   shell: executable=/bin/bash source /etc/profile
-  when: get_tarball.rc == 100
 
-- name: Copy mysql.server
-  template:
-    src=./templates/mysql.server.j2
-    dest=/etc/init.d/mysql.server
-  register: mysql_service
+- name: Create a directory if it does not exist
+  ansible.builtin.file:
+    path: "/var/log/mysql/{{ item }}"
+    state: directory
+    owner: mysql
+    group: mysql
+    mode: '0770'
+  with_items:
+    - error
+    - bin
+    - general
+    - tmp
 
-- name: Fix mysql.server permissions
-  file:
-    path: /etc/init.d/mysql.server
-    owner: root
-    group: root
-    mode: '755'
-  when: mysql_service.changed
-
-- name: Reload service
-  command: systemctl daemon-reload
-  when: mysql_service.changed
+- name: Replace 
+  ansible.builtin.replace:
+    path: /var/lib/mysql/grastate.dat
+    regexp: 'safe_to_bootstrap: 0'
+    replace: 'safe_to_bootstrap: 1'
+  when: inventory_hostname in groups["nodo1_local"]
+  ignore_errors: true
 
 - name: Restart mysql
   service:
     name=mysql
     state=restarted
-  when: inventory_hostname == cluster_hosts[0].node_name
+  when: inventory_hostname in groups["nodo1_local"]
 
 - import_tasks: mysql-initial-queries.yml
-
-- name: Copy wsrep.cnf to the first node
-  template:
-    src="./templates/wsrep/default.cnf.j2"
-    dest=/etc/mysql/include/wsrep.cnf
-  when:
-    - inventory_hostname == cluster_hosts[0].node_name
-    - cluster_hosts|length > 0
-
 
 ##  Logrotate
 ##  =========
@@ -326,7 +280,7 @@
 - name: Configure logrotate
   template:
     src: "../templates/logrotate.j2"
-    dest: "/etc/logrotate.d/mysql"
+    dest: "/etc/logrotate.d/mariadb"
 
 
 ##  Timezone Info
@@ -338,18 +292,14 @@
     state: latest
     install_recommends: no
   register: timezone_info
-  when: inventory_hostname == cluster_hosts[0].node_name
+  when: inventory_hostname in groups["nodo1_local"]
 
 - name: Restart mysql
   service:
     name=mysql
     state=restarted
   when: 
-    - inventory_hostname in groups["nodo_n"]
-
-- import_tasks: pre-mysql-exporter.yml
-
-- import_tasks: install-mysql-exporter.yml
+    - inventory_hostname in groups["nodo_n_local"]
 
 - import_tasks: hardening.yml
 

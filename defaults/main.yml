@@ -37,13 +37,26 @@ mysql_group: mysql
 
 # paths
 
-script_dir: /usr/local/scripts
-mysql_conf_dir: /etc/mysql
-mysql_base_dir: /usr/local/mysql
-mysql_data_dir: /var/mysql/data
-mysql_log_dir: /var/mysql/logs
-mysql_tmp_dir: /var/mysql/tmp
+paths:
+  - /var/lib/mysql
+  - /var/log/mysql
+  - /var/log/mysql/audit
+  - /var/log/mysql/general
+  - /var/log/mysql/error
+  - /var/log/mysql/tmp
 
+
+# mysql_data_dir: /var/lib/mysql
+# mysql_log_dir: /var/log/mysql
+# mysql_audit_dir: /var/log/mysql/audit
+# mysql_general_dir: /var/log/mysql/general
+# mysql_error_dir: /var/log/mysql/error
+# mysql_tmp_dir: /var/log/mysql/tmp
+  
+  
+script_dir: /usr/local/scripts
+mysql_base_dir: /usr/local/mysql
+mysql_conf_dir: /etc/mysql
 
 # system files
 
@@ -59,13 +72,23 @@ mysql_pid: mysqld.pid
 
 # name of the error log, which will be in mysql_log_dir
 mysql_error_log: error.log
+mysql_general_log: general.log
+mysql_bin_log: bin
+mysql_audit_log: audit.log
+
+## Audit Variables
+server_audit_events: "connect,query,table,query_ddl,query_dml,query_dml_no_select,query_dcl"
+audit_file_rotate_size: 1G
+audit_file_rotations: 9
+audit_excl_users: haproxy
+
 
 ## Passwords
-cluster_sst_user:
-cluster_sst_password:
-superuser_password:
-xtrabackup_mysql_user:
-xtrabackup_mysql_password:
+#cluster_sst_user:
+#cluster_sst_password:
+#superuser_password:
+#xtrabackup_mysql_user:
+#xtrabackup_mysql_password:
 
 ## Below user and password should be created after installation.
 mysql_exporter_user:

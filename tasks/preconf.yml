@@ -1,4 +1,15 @@
 ---
+
+- name: Update apt-get repo and cache
+  ansible.builtin.apt:
+    update_cache: true
+    force_apt_get: true
+
+- name: Update apt-get repo and cache
+  ansible.builtin.apt:
+    name: iptables
+    state: present
+
 ##  Ports
 ##  =====
 

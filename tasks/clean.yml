@@ -8,7 +8,7 @@
 
 
 - name: Stop mysql service, if any
-  become: yes
+  become: true
   service:
     name=mysql
     state=stopped
@@ -17,7 +17,7 @@
 # The reason why we do this is that if Galera fails at startup
 # mysqld_safe could remain active even if the service is stopped
 - name: Kill musqld_safe and mysqld, if still active
-  become: yes
+  become: true
   shell: >
     true killall -9 "{{ item }}"
   with_items:
@@ -26,7 +26,7 @@
   when: (db_stop is defined and db_stop == '1') or (db_init is defined and db_init == '1')
 
 - name: Empty datadir
-  become: yes
+  become: true
   shell: >
     rm -Rf "{{ mysql_data_dir }}"
   when: db_init is defined and db_init == '1'

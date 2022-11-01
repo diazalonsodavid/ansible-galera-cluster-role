@@ -1,4 +1,29 @@
 ---
+__mysqld_exporter_checksum: c17402137a4e9745f593127f162c1003298910cb8aa7d05bee3384738de094ae
+mysqld_exporter_binary_local_dir: ""
+mysqld_exporter_version: 0.12.1
+mysqld_exporter_web_listen_address: "0.0.0.0:9104"
+
+mysqld_exporter_dsn: "exporter:password@(localhost:3306)/"
+
+mysqld_exporter_my_cnf: ""
+
+mysqld_exporter_collect: []
+
+mysqld_exporter_no_collect: []
+
+go_arch_map:
+  i386: '386'
+  x86_64: 'amd64'
+  aarch64: 'arm64'
+  armv7l: 'armv7'
+  armv6l: 'armv6'
+
+__mysqld_exporter_user: mysqld-exp
+__mysqld_exporter_group: mysqld-exp
+
+
+
 
 cluster_name: mysql_prod_1
 cluster_hosts:
@@ -18,10 +43,11 @@ primary_config_group: mysql_prod_1
 ### PAHTS
 script_dir: /usr/local/scripts
 mysql_conf_dir: /etc/mysql
-mysql_base_dir: /usr/local/mysql
-mysql_data_dir: /var/mysql/data
-mysql_log_dir: /var/mysql/logs
-mysql_tmp_dir: /var/mysql/tmp
+mysql_base_dir: /usr/lib/galera
+mysql_data_dir: /var/lib/mysql
+mysql_log_dir: /var/log/mysql
+mysql_tmp_dir: /var/log/mysql/tmp
+mysql_audit_dir: /var/log/mysql/audit/audit.log
 
 permission_group_set:
   - main
@@ -43,8 +69,8 @@ cronjob_dirs:
 cronjob_set:
   - { name: 'DB complete dump' ,     state: 'enabled',   hour: '1',  minute: '0',   body: '/usr/local/scripts/db-dump.sh' }
 
-__mysqld_exporter_user: mysqld-exp
-__mysqld_exporter_group: mysqld-exp
+mysqld_exporter_user: mysqld-exp
+mysqld_exporter_group: mysqld-exp
 
 ## LVM
 #

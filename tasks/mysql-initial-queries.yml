@@ -1,20 +1,20 @@
 ---
 
-- name: Get Password MariaDB
-  shell: cat /var/mysql/logs/error.log | grep -i "A temporary password is generated for" | awk '{print$11}'
-  ignore_errors: yes
-  register: securepass
-  when: inventory_hostname == cluster_hosts[0].node_name
+##- name: Get Password MariaDB
+## shell: cat /var/log/mysql/error/error.log | grep -i "A temporary password is generated for" | awk '{print$11}' | tail -1
+##  ignore_errors: true
+##  register: securepass
+##  when: inventory_hostname == cluster_hosts[0].node_name
 
-- name: Output world writable files
-  ansible.builtin.debug:
-    var: securepass.stdout_lines[0]
-  when: inventory_hostname == cluster_hosts[0].node_name
+##- name: Output world writable files
+##  ansible.builtin.debug:
+##    var: securepass.stdout_lines[0]
+##  when: inventory_hostname == cluster_hosts[0].node_name
 
-- name: Get Password MariaDB
+- name: Change Password MariaDB
   shell: |
-    mysql -u root -p"{{ securepass.stdout_lines[0] }}" -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '{{ superuser_password }}'" --connect-expired-password
-  ignore_errors: yes
+    mysql -u root -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '{{ superuser_password }}'"
+  ignore_errors: true
   when: inventory_hostname == cluster_hosts[0].node_name
 
 - name: Create Xtrabackup User
